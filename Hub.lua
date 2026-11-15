@@ -9,7 +9,7 @@
 		tab:AddToggle({ Name = "Thing", Callback = function(v) end })
 ]]
 
-local LIB_URL = "https://raw.githubusercontent.com/YOURNAME/YOURREPO/main/ZUI.lua" -- <- change this
+local LIB_URL = "https://raw.githubusercontent.com/Lazyeee/zhub/main/ZUI.lua" -- <- change this
 
 local genv = getgenv and getgenv() or _G
 if genv.ZHub then pcall(function() genv.ZHub:Destroy() end) end -- re-execute = clean reload
