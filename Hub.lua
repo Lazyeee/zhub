@@ -1,15 +1,16 @@
 --[[
 	Hub.lua - main script. This is the file you loadstring.
 
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/YOURNAME/YOURREPO/main/Hub.lua"))()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/Lazyeee/zhub/main/Hub.lua"))()
 
-	Other scripts can plug into the same window:
+	Other scripts can plug into the same window (see GUIDE.md):
 		local Hub = getgenv().ZHub
-		local tab = Hub:AddTab("My Script")
+		local misc = Hub.Tabs.Misc                 -- add to the Misc tab, or
+		local tab = Hub:AddTab("My Script")        -- make a new tab (sits above Misc)
 		tab:AddToggle({ Name = "Thing", Callback = function(v) end })
 ]]
 
-local LIB_URL = "https://raw.githubusercontent.com/Lazyeee/zhub/main/ZUI.lua" -- <- change this
+local LIB_URL = "https://raw.githubusercontent.com/Lazyeee/zhub/main/ZUI.lua"
 
 local genv = getgenv and getgenv() or _G
 if genv.ZHub then pcall(function() genv.ZHub:Destroy() end) end -- re-execute = clean reload
@@ -159,53 +160,57 @@ Hub:OnUnload(function()
 end)
 
 ----------------------------------------------------------------------
--- Tab: Performance
+-- Tab: Misc  (every universal feature lives here)
+-- Top to bottom = priority. Each group is a section with a separator line.
+-- To reorder: move a whole "-- group" block up or down in this file.
+-- Game-specific tabs made by other scripts sit ABOVE Misc automatically.
 ----------------------------------------------------------------------
-local perf = Hub:AddTab("Performance")
-local boosters = {}
+local misc = Hub:AddTab("Misc", 9000)
 
-perf:AddSection("FPS boost")
-boosters[#boosters + 1] = perf:AddToggle({ Name = "Smooth plastic + no part shadows", Callback = function(v)
+-- group 1: FPS boost ---------------------------------------------------
+misc:AddSection("FPS boost")
+local boosters = {}
+boosters[#boosters + 1] = misc:AddToggle({ Name = "Smooth plastic + no part shadows", Callback = function(v)
 	if v then plastic.on() else plastic.off() end
 end })
-boosters[#boosters + 1] = perf:AddToggle({ Name = "Hide decals / textures", Callback = function(v)
+boosters[#boosters + 1] = misc:AddToggle({ Name = "Hide decals / textures", Callback = function(v)
 	if v then decals.on() else decals.off() end
 end })
-boosters[#boosters + 1] = perf:AddToggle({ Name = "Disable particles / trails / beams", Callback = function(v)
+boosters[#boosters + 1] = misc:AddToggle({ Name = "Disable particles / trails / beams", Callback = function(v)
 	if v then effects.on() else effects.off() end
 end })
-boosters[#boosters + 1] = perf:AddToggle({ Name = "Disable post-processing", Callback = function(v)
+boosters[#boosters + 1] = misc:AddToggle({ Name = "Disable post-processing", Callback = function(v)
 	if v then post.on() else post.off() end
 end })
-boosters[#boosters + 1] = perf:AddToggle({ Name = "Disable global shadows", Callback = setShadows })
-boosters[#boosters + 1] = perf:AddToggle({ Name = "Calm water", Callback = setWater })
-
-perf:AddButton({ Name = "Enable ALL boosters", Callback = function()
+boosters[#boosters + 1] = misc:AddToggle({ Name = "Disable global shadows", Callback = setShadows })
+boosters[#boosters + 1] = misc:AddToggle({ Name = "Calm water", Callback = setWater })
+misc:AddButton({ Name = "Enable ALL boosters", Callback = function()
 	for _, t in ipairs(boosters) do t:Set(true) end
 	Hub:Notify("All boosters enabled")
 end })
-perf:AddButton({ Name = "Disable all boosters", Callback = function()
+misc:AddButton({ Name = "Disable all boosters", Callback = function()
 	for _, t in ipairs(boosters) do t:Set(false) end
 end })
 
-perf:AddSection("Renderer")
-perf:AddSlider({ Name = "Graphics level", Min = 1, Max = 10, Default = 5, Callback = function(n)
+-- group 2: Renderer ----------------------------------------------------
+misc:AddSection("Renderer")
+misc:AddSlider({ Name = "Graphics level", Min = 1, Max = 10, Default = 5, Callback = function(n)
 	pcall(function()
 		settings().Rendering.QualityLevel = Enum.QualityLevel["Level" .. string.format("%02d", n)]
 	end)
 end })
-perf:AddNumberBox({ Name = "FPS cap (0 = unlimited)", Min = 0, Max = 1000, Default = 60, Integer = true, Callback = function(n)
+misc:AddNumberBox({ Name = "FPS cap (0 = unlimited)", Min = 0, Max = 1000, Default = 60, Integer = true, Callback = function(n)
 	if setfpscap then setfpscap(n) else Hub:Notify("Executor has no setfpscap") end
 end })
-perf:AddToggle({ Name = "Show FPS counter", Callback = setFpsCounter })
 
-----------------------------------------------------------------------
--- Tab: Utilities  (drop your own scattered utils in here)
-----------------------------------------------------------------------
-local utils = Hub:AddTab("Utilities")
-utils:AddSection("General")
-utils:AddToggle({ Name = "Anti-AFK", Callback = setAntiAfk })
-utils:AddButton({ Name = "Rejoin server", Callback = function()
+-- group 3: Display -----------------------------------------------------
+misc:AddSection("Display")
+misc:AddToggle({ Name = "Show FPS counter", Callback = setFpsCounter })
+
+-- group 4: Utilities ---------------------------------------------------
+misc:AddSection("Utilities")
+misc:AddToggle({ Name = "Anti-AFK", Callback = setAntiAfk })
+misc:AddButton({ Name = "Rejoin server", Callback = function()
 	local ts = game:GetService("TeleportService")
 	if #Players:GetPlayers() <= 1 then
 		Players.LocalPlayer:Kick("\nRejoining...")
@@ -215,23 +220,29 @@ utils:AddButton({ Name = "Rejoin server", Callback = function()
 		ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, Players.LocalPlayer)
 	end
 end })
-utils:AddSection("Your scripts")
-utils:AddLabel("Add your other utilities here, or from any other script use getgenv().ZHub:AddTab(...)")
+
+-- group 5: Component examples (copy what you need, delete this group when done)
+misc:AddSection("Component examples")
+misc:AddButton({ Name = "Button", Callback = function() Hub:Notify("Button pressed") end })
+misc:AddToggle({ Name = "Toggle", Default = false, Callback = function(v) print("toggle", v) end })
+misc:AddSlider({ Name = "Slider", Min = 0, Max = 100, Default = 25, Increment = 1, Suffix = "%", Callback = function(v) print("slider", v) end })
+misc:AddNumberBox({ Name = "Number box", Min = 0, Max = 500, Default = 16, Callback = function(v) print("number", v) end })
+misc:AddTextBox({ Name = "Text box", Placeholder = "type...", Callback = function(v) print("text", v) end })
+misc:AddDropdown({ Name = "Dropdown", Values = { "One", "Two", "Three" }, Default = "One", Callback = function(v) print("dropdown", v) end })
+misc:AddKeybind({ Name = "Keybind", Default = "F", Callback = function() Hub:Notify("Key pressed") end })
+misc:AddColorPicker({ Name = "Color picker", Default = Color3.fromRGB(88, 130, 255), Callback = function(c) print("color", c) end })
+misc:AddLabel("Values are available any time as Hub.Flags[\"Slider\"] etc.")
 
 ----------------------------------------------------------------------
--- Tab: Components (every template, copy what you need)
+-- Optional feature modules: repo files that return function(Hub) ... end
+-- Add file names here, e.g. { "modules/Visual.lua", "modules/Fun.lua" }
 ----------------------------------------------------------------------
-local demo = Hub:AddTab("Components")
-demo:AddSection("Templates")
-demo:AddButton({ Name = "Button", Callback = function() Hub:Notify("Button pressed") end })
-demo:AddToggle({ Name = "Toggle", Default = false, Callback = function(v) print("toggle", v) end })
-demo:AddSlider({ Name = "Slider", Min = 0, Max = 100, Default = 25, Increment = 1, Suffix = "%", Callback = function(v) print("slider", v) end })
-demo:AddNumberBox({ Name = "Number box", Min = 0, Max = 500, Default = 16, Callback = function(v) print("number", v) end })
-demo:AddTextBox({ Name = "Text box", Placeholder = "type...", Callback = function(v) print("text", v) end })
-demo:AddDropdown({ Name = "Dropdown", Values = { "One", "Two", "Three" }, Default = "One", Callback = function(v) print("dropdown", v) end })
-demo:AddKeybind({ Name = "Keybind", Default = "F", Callback = function() Hub:Notify("Key pressed") end })
-demo:AddColorPicker({ Name = "Color picker", Default = Color3.fromRGB(88, 130, 255), Callback = function(c) print("color", c) end })
-demo:AddLabel("Values are available any time as Hub.Flags[\"Slider\"] etc.")
+local BASE = (LIB_URL:gsub("ZUI%.lua$", ""))
+local MODULES = {}
+for _, file in ipairs(MODULES) do
+	local ok, err = pcall(function() loadstring(game:HttpGet(BASE .. file))()(Hub) end)
+	if not ok then warn("[ZHub] module failed: " .. file .. " - " .. tostring(err)) end
+end
 
 ----------------------------------------------------------------------
 Hub:AddSettingsTab()

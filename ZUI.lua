@@ -3,8 +3,8 @@
 	-----------------------------------------------------
 	* Draggable window, resizable corner, minimize (—) and close (X = hide)
 	* Draggable floating button to reopen/close (works on touch)
-	* Components: Section, Label, Button, Toggle, Slider, NumberBox, TextBox,
-	  Dropdown, ColorPicker
+	* Components: Section (with separator line), Divider, Label, Button, Toggle, Slider,
+	  NumberBox, TextBox, Dropdown, ColorPicker, Keybind (typed key, works with virtual keyboards)
 	* Config: autosave, named configs, export / import (JSON), saves UI size+position
 	* Optimised: no per-frame loops, drag listeners only exist while dragging,
 	  debounced saves, hidden tabs are not rendered
@@ -205,6 +205,7 @@ function Library.new(opts)
 	self.ToggleKey = opts.ToggleKey or Enum.KeyCode.RightShift
 	self.Flags, self._saved, self._objects = {}, {}, {}
 	self._conns, self._cleanup, self._binds = {}, {}, {}
+	self.Tabs = {} -- Hub.Tabs["Misc"] etc., so other scripts can add to an existing tab
 	self._tabCount, self._toastToken = 0, 0
 	self._minSize = opts.MinSize or Vector2.new(320, 210)
 	self._defaultSize = opts.Size or Vector2.new(480, 310)
@@ -533,14 +534,15 @@ function Window:_select(tab)
 	tab.Button.TextColor3 = Theme.Text
 end
 
-function Window:AddTab(name)
+-- order (optional): lower = higher in the sidebar. Default = creation order.
+function Window:AddTab(name, order)
 	self._tabCount += 1
-	local tab = setmetatable({ Window = self, Name = name, _n = 0 }, Tab)
+	local tab = setmetatable({ Window = self, Name = name, Order = order or self._tabCount, _n = 0 }, Tab)
 
 	tab.Button = create("TextButton", {
 		Name = name, Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Theme.Element,
 		BackgroundTransparency = 1, Text = name, Font = Enum.Font.GothamMedium, TextSize = 13,
-		TextColor3 = Theme.SubText, AutoButtonColor = false, LayoutOrder = self._tabCount,
+		TextColor3 = Theme.SubText, AutoButtonColor = false, LayoutOrder = tab.Order,
 		Parent = self._sidebar,
 	})
 	corner(tab.Button, 6)
@@ -554,7 +556,8 @@ function Window:AddTab(name)
 	pad(tab.Page, 8, 8, 10, 28)
 
 	tab.Button.MouseButton1Click:Connect(function() self:_select(tab) end)
-	if not self._current then self:_select(tab) end
+	self.Tabs[name] = tab
+	if not self._current or tab.Order < self._current.Order then self:_select(tab) end
 	return tab
 end
 
@@ -571,11 +574,29 @@ end
 ----------------------------------------------------------------------
 -- Components
 ----------------------------------------------------------------------
+-- Section header with a separator line under it. Use one per group of features.
 function Tab:AddSection(text)
 	self._n += 1
-	return label({
+	local f = create("Frame", {
+		Size = UDim2.new(1, 0, 0, 32), BackgroundTransparency = 1, LayoutOrder = self._n, Parent = self.Page,
+	})
+	label({
 		Text = string.upper(text), Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = Theme.Accent,
-		Size = UDim2.new(1, 0, 0, 20), LayoutOrder = self._n, Parent = self.Page,
+		Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(2, 8), Parent = f,
+	})
+	create("Frame", {
+		Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1),
+		BackgroundColor3 = Theme.Stroke, BorderSizePixel = 0, Parent = f,
+	})
+	return f
+end
+
+-- Plain separator line (no title)
+function Tab:AddDivider()
+	self._n += 1
+	return create("Frame", {
+		Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = Theme.Stroke, BorderSizePixel = 0,
+		LayoutOrder = self._n, Parent = self.Page,
 	})
 end
 
@@ -1006,8 +1027,7 @@ end
 -- Built-in settings tab (config manager). Always sorted last.
 ----------------------------------------------------------------------
 function Window:AddSettingsTab()
-	local tab = self:AddTab("Settings")
-	tab.Button.LayoutOrder = 9999
+	local tab = self:AddTab("Settings", 9999)
 
 	tab:AddSection("Configs")
 	local nameBox = tab:AddTextBox({ Name = "Config name", Default = "default", Placeholder = "name", Save = false })
