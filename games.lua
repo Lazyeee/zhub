@@ -14,7 +14,7 @@
 ]]
 
 return {
-	games = {
+	games = { [10725638928] = { name = "1 Player Baseplate", folder = "games/1-player-baseplate" },
 		-- [1234567890] = { name = "Example Game", folder = "games/example-game" },
 	},
 	places = {
