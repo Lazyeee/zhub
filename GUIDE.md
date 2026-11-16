@@ -5,52 +5,56 @@ Read this whole guide before writing code. Do NOT create your own UI, windows, S
 Use ZUI for every menu element.
 
 Repo: `https://raw.githubusercontent.com/Lazyeee/zhub/main/`
-
-| File | What it is |
-|------|------------|
-| `ZUI.lua` | The UI library (window, tabs, components, config system). Never rewrite it. |
-| `Hub.lua` | The main script that I loadstring. It creates the window and the built-in features. |
-| `modules/*.lua` | Optional feature modules (one file per group of features). |
-
-Run command: `loadstring(game:HttpGet("https://raw.githubusercontent.com/Lazyeee/zhub/main/Hub.lua"))()`
+Run command: `loadstring(game:HttpGet("https://raw.githubusercontent.com/Lazyeee/zhub/main/loader.lua"))()`
 
 ---
 
-## 1. How the hub is organised
+## 1. Repo structure
 
-- One window with a left sidebar of **tabs**. It has a floating open/close button for mobile, a movable
-  window, a resizable corner, and a minimize and an X button (X only hides it).
-- **Misc tab**: all universal features live here (FPS boost, renderer, display, utilities, component
-  examples). Each group is a section with a separator line. Order = priority, so the most important group is at the top.
-- **Game-specific features** get their own tab. Tabs sort by creation order, except Misc (always near the
-  bottom) and Settings (always last).
-- **Settings tab**: config save/load/delete, export/import (JSON), reset window, unload, menu key.
-  It is added once by `Hub.lua`. Feature scripts must never call `AddSettingsTab`.
-- Globals available after `Hub.lua` has run:
-  - `getgenv().ZHub` is the window (also `Hub` inside `Hub.lua`)
-  - `getgenv().ZUI` is the library
-  - `Hub.Tabs["Misc"]` (or any tab name) returns an existing tab
-  - `Hub.Flags["Component name"]` gives the current value of any component
+```
+loader.lua                      only entry point; never edit unless asked
+Hub.lua                         1-line shim that calls loader.lua
+ZUI.lua                         UI library; never rewrite
+games.lua                       registry: game ID -> folder
+universal/
+  Misc.lua                      universal features (shown in EVERY game)
+games/
+  <game-name>/
+    init.lua                    builds this game's tab(s); runs only in that game
+    features/
+      <Feature>.lua             one file per feature; downloaded on first enable
+```
 
-### Features that already exist in Misc (do not duplicate)
-FPS boost: smooth plastic and no part shadows, hide decals/textures, disable particles/trails/beams, disable
-post-processing, disable global shadows, calm water, enable/disable all boosters.
-Renderer: graphics level slider, FPS cap box.
-Display: FPS counter.
-Utilities: Anti-AFK, Rejoin server.
-Component examples: one of every component.
+How it runs: `loader.lua` loads ZUI, reads `games.lua`, matches `game.PlaceId` first and then `game.GameId`,
+runs ONLY that game's `init.lua`, then runs `universal/Misc.lua`, then adds the Settings tab.
+Features never leak between games because each game folder is only fetched in that game.
+
+### Window layout
+- Left sidebar of tabs. Game tab(s) first, **Misc** near the bottom, **Settings** last (added by the loader; never call `AddSettingsTab`).
+- Misc holds the universal features as sections with separator lines. Order = priority, top = most important.
+- Floating open/close button for mobile; the X only hides the window.
+
+### Globals and Hub fields
+- `getgenv().ZHub` is the window (called `Hub` inside files), `getgenv().ZUI` is the library
+- `Hub.Tabs["Name"]` returns an existing tab
+- `Hub.Flags["Component name"]` is the current value of any component
+- `Hub.Entry` is this game's registry entry, `Hub.GameFolder` is e.g. `"games/example-game/"`
+
+### Already in universal/Misc.lua (do not duplicate)
+FPS boost (smooth plastic and no part shadows, hide decals/textures, disable particles/trails/beams,
+disable post-processing, disable global shadows, calm water, enable/disable all), Renderer (graphics level,
+FPS cap), Display (FPS counter), Utilities (Anti-AFK, Rejoin), and one example of every component.
 
 ---
 
 ## 2. Component API
 
-Get a tab with `local tab = Hub:AddTab("Name")` (new tab) or `local tab = Hub.Tabs["Misc"]` (existing tab).
-Components are added top to bottom in the order you call them.
+Get a tab with `local tab = Hub:AddTab("Name")` or `local tab = Hub.Tabs["Misc"]`.
 
 ```lua
 tab:AddSection("Title")      -- header with a separator line; start every group of features with one
-tab:AddDivider()             -- plain separator line, no title
-tab:AddLabel("text")         -- returns obj; obj:SetText("new text")
+tab:AddDivider()             -- plain separator line
+tab:AddLabel("text")         -- obj:SetText("new text")
 tab:AddButton{ Name="", Callback=function() end }
 
 tab:AddToggle{ Name="", Default=false, Callback=function(on) end }
@@ -62,94 +66,102 @@ tab:AddColorPicker{ Name="", Default=Color3.fromRGB(255,255,255), Callback=funct
 tab:AddKeybind{ Name="", Default="F", Callback=function() end }
 ```
 
-Options shared by every component that has a value:
-- `Flag = "id"`: key used for saving and `Hub.Flags` (defaults to `Name`).
-- `Save = false`: do not store this value in configs (use for lists, temporary text, etc.).
+Options for every value component: `Flag = "id"` (save key, defaults to Name) and `Save = false` (keep out of configs).
+Every value component returns `obj` with `obj.Value` and `obj:Set(value, silent)` (`silent` = no callback).
 
-Every value component returns an object: `obj.Value` (current), `obj:Set(value, silent)`
-(`silent = true` updates the UI without running the callback).
-
-### Keybind details
-- The user TYPES the key ("F", "5", "LeftShift", "Space") instead of pressing it, so it works with on-screen keyboards.
-- `Callback()` runs when the key is pressed. With `Hold = true` it runs `Callback(true)` on key down
-  and `Callback(false)` on key up.
-- `OnChanged(keyName)` runs when the user changes the key.
-- Keybinds are ignored while any TextBox is focused.
-- To bind a key to a toggle: `Callback = function() myToggle:Set(not myToggle.Value) end`.
+Keybind: the user TYPES the key ("F", "5", "LeftShift") so it works with on-screen keyboards. `Callback()` runs on press;
+with `Hold = true` it runs `Callback(true)` on down and `Callback(false)` on up. `OnChanged(keyName)` runs when the key changes.
+Ignored while any TextBox is focused. Keybind callbacks never run on load.
 
 ### Callback timing (important)
-- Callbacks run on every change, and on drag for sliders and color pickers. Keep them cheap.
-- A callback also runs ONCE when the hub loads if a saved value exists (or if a toggle has `Default = true`).
-  So the "off" path must be safe to run when the feature was never on.
-- Keybind callbacks never run on load.
+- Callbacks run on every change (and while dragging sliders/color pickers), so keep them cheap.
+- A callback also runs ONCE on load if a saved value exists (or a toggle has `Default = true`), including with `false`.
+  So the "off" path must be safe when the feature was never on. `Hub:SetFeature(name, false)` already handles this.
 
 ---
 
-## 3. Rules for every feature you write
+## 3. Game features: how to write them
 
-1. **Unique names.** Every `Name` (or `Flag`) must be unique across the whole hub, not just the tab.
-2. **Cleanup.** Whatever a feature changes must be fully reverted when its toggle turns off. Also register
-   `Hub:OnUnload(function() ... end)` so unloading the UI reverts everything.
-3. **Performance first.** No `while true` or `RenderStepped` loops running by default. Connect events only
-   when a toggle is ON, store the connection, and `:Disconnect()` it when OFF. Prefer events
-   (`.Changed`, `.ChildAdded`) over polling. If a loop is unavoidable, use `task.wait(0.25)` or slower and stop it when OFF.
-   Big sweeps over `GetDescendants()` must yield (`task.wait()`) every few hundred items.
-4. **Executor safety.** Check that executor functions exist before using them
-   (`if setfpscap then`, `if getgenv then`) and wrap risky calls in `pcall`.
-5. **Mobile first.** No features that need a physical keyboard or mouse to use. Prefer toggles, sliders and buttons.
-6. **No new GUIs.** Need an on-screen element (like an FPS label)? Parent it to `Hub.Root` (a ScreenGui),
-   never create a new ScreenGui.
-7. **Notifications.** Use `Hub:Notify("text", seconds)` for feedback.
-8. **Services.** Use `game:GetService(...)` at the top of the file, not `game.Players`.
-9. **Do not modify** the library functions or touch `Settings`. If you need a component that ZUI doesn't have,
-   say so and describe it instead of faking it.
-
----
-
-## 4. Where to put new code
-
-**A. A feature for the Misc tab (universal feature):** give me a new group to paste into `Hub.lua`
-inside the Misc section, starting with `misc:AddSection("Group name")`. Say which existing group it should sit
-below so the priority order stays right.
-
-**B. A feature module (game-specific or large):** write it as its own file `modules/Name.lua`:
+A feature file returns a table with `Enable` and `Disable`. It is downloaded the first time its toggle is switched on.
 
 ```lua
-return function(Hub)
-	local Players = game:GetService("Players")
-	local tab = Hub:AddTab("Tab name")           -- or: local tab = Hub.Tabs["Misc"]
+-- games/<game-name>/features/MyFeature.lua
+local Players = game:GetService("Players")
+local conn
+local Feature = {}
 
+function Feature.Enable(Hub)
+	if conn then return end
+	conn = Players.PlayerAdded:Connect(function(p) Hub:Notify(p.Name .. " joined", 2) end)
+end
+
+function Feature.Disable(Hub)
+	if conn then conn:Disconnect(); conn = nil end   -- undo EVERYTHING Enable did
+end
+
+return Feature
+```
+
+And in the game's `init.lua`, one toggle per feature:
+
+```lua
+return function(Hub, entry)
+	local tab = Hub:AddTab(entry.name)
 	tab:AddSection("Group name")
-	local conn
-	tab:AddToggle({ Name = "Example feature", Callback = function(on)
-		if conn then conn:Disconnect() conn = nil end
-		if on then
-			conn = Players.LocalPlayer.CharacterAdded:Connect(function(char)
-				-- do something
-			end)
-		else
-			-- revert anything the feature changed
-		end
-	end })
-
-	Hub:OnUnload(function() if conn then conn:Disconnect() end end)
+	tab:AddToggle({ Name = "My feature", Callback = function(on) Hub:SetFeature("MyFeature", on) end })
 end
 ```
 
-Modules are loaded by `Hub.lua`: I add the file path (for example `"modules/Name.lua"`) to its `MODULES` list.
-Modules run before the Settings tab is added, so their tabs appear above Settings.
+Hub helpers added by the loader:
+- `Hub:SetFeature(name, on)`: loads `GameFolder .. "features/" .. name .. ".lua"` on first enable, then calls Enable/Disable
+- `Hub:LoadFeature(name)`: returns the cached feature table (use for sliders/dropdowns that talk to a feature)
+- `Hub:Run(path)`: downloads and runs any repo file (if it returns a function, it is called with `(Hub, entry)`)
+- `Hub:Notify(text, seconds)`, `Hub:OnUnload(fn)`, `Hub:SetVisible(bool)`, `Hub:Destroy()`
+
+Features that need settings (a slider, a color) should expose them on the feature table, for example
+`Feature.SetSize = function(n) ... end`, and the slider callback calls `Hub:LoadFeature("MyFeature").SetSize(n)`
+only when the feature is loaded.
 
 ---
 
-## 5. Output format I want back
+## 4. Adding a new game
 
-- One code block per file, with the filename above it (for example `modules/Visual.lua`).
-- If a change is needed in `Hub.lua`, show only the lines to add and say exactly where they go.
-- After the code, give a short list: what each feature does, and any executor function it depends on.
-- Ask me before guessing if the request is unclear (game, exact behaviour, mobile or PC).
+1. Create `games/<game-name>/init.lua` (copy `games/example-game/init.lua`) and `games/<game-name>/features/`.
+2. Add one line to `games.lua` inside `games = { ... }`:
+   `[GameId] = { name = "Display Name", folder = "games/<game-name>" },`
+   Use `game.GameId` by default. Use the `places` table (keyed by `game.PlaceId`) only for a specific place that needs its own folder.
+   Set `universal = false` on the entry to hide the universal Misc tab for that game.
+3. Never add game code to `universal/Misc.lua` or `loader.lua`.
+
+For a feature that works in every game, add a new group to `universal/Misc.lua`, starting with
+`misc:AddSection("Group name")`, placed in priority order.
 
 ---
 
-## 6. My request
+## 5. Rules for every feature you write
 
-<describe the features here, and say which tab or group they belong in>
+1. **Unique names.** Every component `Name` (or `Flag`) must be unique across the whole hub, across tabs and games.
+2. **Cleanup.** `Disable` must fully revert what `Enable` changed. Features are also disabled automatically on unload.
+3. **Performance first.** No always-running loops. Connect events only while a feature is ON and disconnect when OFF.
+   Prefer events over polling. If a loop is unavoidable, use `task.wait(0.25)` or slower and stop it on Disable.
+   Sweeps over `GetDescendants()` must yield (`task.wait()`) every few hundred items.
+4. **Executor safety.** Check executor functions exist (`if setfpscap then`) and `pcall` risky calls.
+5. **Mobile first.** No features that need a physical keyboard or mouse. Prefer toggles, sliders and buttons.
+6. **No new GUIs.** If you need an on-screen element, parent it to `Hub.Root`, never create a ScreenGui.
+7. **Services.** `game:GetService(...)` at the top of the file.
+8. **Do not modify** `ZUI.lua` or `loader.lua`. If a component is missing, say so and describe it.
+
+---
+
+## 6. Output format I want back
+
+- One code block per file, with the full repo path above it (for example `games/example-game/features/Esp.lua`).
+- If a change to an existing file is needed, show only the lines to add and say exactly where they go.
+- After the code, list what each feature does and which executor functions it needs.
+- Ask me before guessing if the request is unclear (which game, exact behaviour).
+
+---
+
+## 7. My request
+
+<describe the game and features here>
