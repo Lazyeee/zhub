@@ -14,10 +14,10 @@
 ]]
 
 return {
-	games = { [10725638928] = { name = "1 Player Baseplate", folder = "games/1-player-baseplate" },
+	games = { [10725638928] = { name = "1 Player Baseplate", folder = "games/1-player-baseplate" }
 		-- [1234567890] = { name = "Example Game", folder = "games/example-game" },
 	},
-	places = {
+	places = { [77252126004082] = { name = "1 Player Baseplate", folder = "games/1-player-baseplate", universal = true },
 		-- [9876543210] = { name = "Example Lobby", folder = "games/example-lobby", universal = false },
 	},
 }
